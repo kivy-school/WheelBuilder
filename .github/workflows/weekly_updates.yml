@@ -1,0 +1,98 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Weekly Anaconda Wheels Update
+
+# Controls when the workflow will run
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 1 * * 0"
+    
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    name: Build iOS Wheels
+    # The type of runner that the job will run on
+    #runs-on: self-hosted
+    runs-on: macos-15
+    permissions:
+        contents: write
+    outputs:
+      needs_upload: ${{ steps.needs_upload.outputs.var }}
+    
+    steps:
+      - uses: actions/checkout@v5
+      
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+
+      # - name: install wheelbuilder
+      #   run: |
+      #     wget -O WheelBuilderCLI.tar.gz "https://github.com/Py-Swift/WheelBuilder/releases/latest/download/WheelBuilderCLI.tar.gz"
+      #     tar -xzvf WheelBuilderCLI.tar.gz -C ./
+
+      - name: install pkg-config
+        run: brew install pkg-config
+
+      - name: install cibuildwheel
+        run: uv pip install cibuildwheel
+
+      - name: install maturin
+        run: uv pip install maturin
+
+      - name: install rust ios targets
+        run: |
+          rustup target add aarch64-apple-ios
+          rustup target add aarch64-apple-ios-sim
+          rustup target add x86_64-apple-ios
+          rustup target add aarch64-linux-android
+          rustup target add x86_64-linux-android
+
+      - name: install android ndk
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r28c
+        
+      - name: build wheels
+        run: |
+          export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+          export ANDROID_API_LEVEL=24
+          mkdir -p output/wheels
+          uv run wheelbuilder action-build $PWD/output/wheels --checks
+
+      - id: needs_upload
+        if: always()
+        run: |
+          mkdir -p output/wheels
+          ls output/wheels
+          if find output/wheels -mindepth 1 -maxdepth 1 | read; then
+            echo "var=true" >> $GITHUB_OUTPUT
+          else
+            echo "var=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: display needs_upload
+        run: |
+          echo "${{ steps.needs_upload.outputs.var }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.needs_upload.outputs.var == 'true'
+        with:
+          name: wheels-output
+          path: ./output
+
+  r2_upload:
+    name: Upload to R2
+    needs: [build]
+    if: always() && needs.build.outputs.needs_upload == 'true'
+    uses: ./.github/workflows/r2-upload.yml
+    secrets: inherit
+

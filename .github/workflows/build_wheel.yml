@@ -1,0 +1,124 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Build Wheel
+run-name: "Building Wheel (${{ github.event.inputs.name }} ${{ github.event.inputs.version }}) [${{ github.event.inputs.platform || 'ios+android' }}]"
+
+# Controls when the workflow will run
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'pypi name'
+        required: true
+        type: string
+      version:
+        description: 'pypi version'
+        required: true
+        type: string
+      platform:
+        description: 'pypi platform (ios or android, empty = both)'
+        required: false
+        default: ''
+        type: string
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    name: Build Wheels
+    # The type of runner that the job will run on
+    #runs-on: self-hosted
+    runs-on: macos-15
+    permissions:
+        contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+      
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.13'
+      #- uses: actions/setup-python@v6
+      #  with:
+      #    python-version: '3.14.rc3'
+
+      # - name: install wheelbuilder
+      #   run: |
+      #     wget -O WheelBuilderCLI.tar.gz "https://github.com/Py-Swift/WheelBuilder/releases/latest/download/WheelBuilderCLI.tar.gz"
+      #     tar -xzvf WheelBuilderCLI.tar.gz -C ./
+
+      - name: install pkg-config
+        run: brew install pkg-config
+
+      - name: install cibuildwheel
+        run: uv pip install cibuildwheel
+
+      - name: install maturin
+        run: uv pip install maturin
+
+      - name: install rust ios targets
+        run: |
+          rustup target add aarch64-apple-ios
+          rustup target add aarch64-apple-ios-sim
+          rustup target add x86_64-apple-ios
+          rustup target add aarch64-linux-android
+          rustup target add x86_64-linux-android
+
+      - name: install android ndk
+        if: github.event.inputs.platform != 'ios'
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r28c
+
+      - name: debug android env
+        if: github.event.inputs.platform != 'ios'
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ndk-path=${{ steps.setup-ndk.outputs.ndk-path }}"
+          ls "${{ steps.setup-ndk.outputs.ndk-path }}" || true
+
+      - name: build wheels
+        run: |
+          PLATFORMS="${{ github.event.inputs.platform }}"
+          if [ -z "$PLATFORMS" ]; then
+            PLATFORMS="ios android"
+          fi
+          mkdir -p output/wheels
+          for PLATFORM in $PLATFORMS; do
+            if [ "$PLATFORM" = "android" ]; then
+              export ANDROID_API_LEVEL=24
+              export ANDROID_NDK_HOME="${{ steps.setup-ndk.outputs.ndk-path }}"
+            fi
+            uv run wheelbuilder build ${{ github.event.inputs.name }} $PWD/output/wheels --version ${{ github.event.inputs.version }} --platform $PLATFORM
+          done
+
+      - name: verify wheels were produced
+        run: |
+          echo "Wheel files in output/wheels:"
+          ls output/wheels/
+          WHL_COUNT=$(find output/wheels -name "*.whl" | wc -l | tr -d ' ')
+          echo "Found $WHL_COUNT wheel(s)"
+          if [ "$WHL_COUNT" -eq 0 ]; then
+            echo "ERROR: cibuildwheel produced no .whl files — build failed."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-output
+          path: ./output
+
+  r2_upload:
+    name: Upload to R2
+    needs: [build]
+    uses: ./.github/workflows/r2-upload.yml
+    secrets: inherit
+      
+
+          

@@ -1,0 +1,37 @@
+name: Upload to R2
+
+on:
+  workflow_call:
+    secrets:
+      R2_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  r2_upload:
+    name: Upload to R2
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-output
+
+      - name: configure aws cli for r2
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          aws configure set region auto
+
+      - name: upload wheels to r2
+        run: |
+          ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          for FILE in wheels/*.whl; do
+            BASENAME=$(basename "$FILE")
+            echo "Uploading $BASENAME"
+            aws s3 cp "$FILE" "s3://pypi-packages/packages/$BASENAME" \
+              --endpoint-url "$ENDPOINT"
+          done
