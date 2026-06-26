@@ -24,12 +24,12 @@ from wheelbuilder.wheels.cibuildwheel.pynacl import Pynacl
 from wheelbuilder.wheels.cibuildwheel.regex import Regex
 from wheelbuilder.wheels.cibuildwheel.sqlalchemy import SQLAlchemy
 from wheelbuilder.wheels.cibuildwheel.zeroconf import Zeroconf
-from wheelbuilder.wheels.library.ffmpeg import Ffmpeg
-from wheelbuilder.wheels.maturin.cryptography import Cryptography
-from wheelbuilder.wheels.maturin.orjson import Orjson
-from wheelbuilder.wheels.maturin.pendulum import Pendulum
-from wheelbuilder.wheels.maturin.pydantic_core import Pydantic_core
+from wheelbuilder.wheels.cibuildwheel.cryptography import Cryptography
+from wheelbuilder.wheels.cibuildwheel.orjson import Orjson
+from wheelbuilder.wheels.cibuildwheel.pendulum import Pendulum
+from wheelbuilder.wheels.cibuildwheel.pydantic_core import Pydantic_core
 
+from wheelbuilder.wheels.library.ffmpeg import Ffmpeg
 
 # Packages excluded from the weekly auto-update scheduler.
 # Add names here to keep a package in WHEELS (manually buildable)
