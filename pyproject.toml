@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wheelbuilder"
+version = "0.1.0"
+description = "Build Python wheels for iOS and Android from a curated package list"
+requires-python = ">=3.11"
+
+[project.scripts]
+wheelbuilder = "wheelbuilder.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wheelbuilder"]
