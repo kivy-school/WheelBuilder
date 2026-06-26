@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: wheelbuilder
+Version: 0.1.0
+Summary: Build Python wheels for iOS and Android from a curated package list
+Requires-Python: >=3.11
+License-File: LICENSE
+Dynamic: license-file
